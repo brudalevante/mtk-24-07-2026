@@ -1,0 +1,20 @@
+--- a/target/linux/mediatek/image/filogic.mk
++++ b/target/linux/mediatek/image/filogic.mk
+@@ -1946,7 +1946,7 @@ define Device/mediatek_mt7986a-rfb
+   DEVICE_DTS_DIR := $(DTS_DIR)/
+   DEVICE_DTC_FLAGS := --pad 4096
+   DEVICE_DTS_LOADADDR := 0x43f00000
+-  DEVICE_PACKAGES := kmod-mt7915e kmod-mt7986-firmware mt7986-wo-firmware blkid bspconf
++  DEVICE_PACKAGES := mt7986-wo-firmware blkid bspconf
+   KERNEL_LOADADDR := 0x46000000
+   KERNEL := kernel-bin | gzip
+   KERNEL_INITRAMFS := kernel-bin | lzma | secure-boot-initramfs | \
+@@ -1971,7 +1971,7 @@ define Device/mediatek_mt7986b-rfb
+   DEVICE_DTS_DIR := $(DTS_DIR)/
+   DEVICE_DTC_FLAGS := --pad 4096
+   DEVICE_DTS_LOADADDR := 0x43f00000
+-  DEVICE_PACKAGES := kmod-mt7915e kmod-mt7986-firmware mt7986-wo-firmware blkid bspconf
++  DEVICE_PACKAGES := mt7986-wo-firmware blkid bspconf
+   KERNEL_LOADADDR := 0x46000000
+   KERNEL := kernel-bin | gzip
+   KERNEL_INITRAMFS := kernel-bin | lzma | secure-boot-initramfs | \

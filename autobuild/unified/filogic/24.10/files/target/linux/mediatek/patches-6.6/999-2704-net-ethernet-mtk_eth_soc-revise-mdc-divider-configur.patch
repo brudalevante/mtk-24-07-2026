@@ -1,0 +1,119 @@
+From 558ea0c37532f55ae945ce431f68775ab887f511 Mon Sep 17 00:00:00 2001
+From: Bo-Cun Chen <bc-bocun.chen@mediatek.com>
+Date: Tue, 16 Dec 2025 22:35:16 +0800
+Subject: [PATCH] net: ethernet: mtk_eth_soc: revise mdc divider configuration
+
+In the current method, the MDC divider was reset to the default setting
+of 2.5MHz after the NETSYS SER. Therefore, we need to move the MDC
+divider configuration function to mtk_hw_init().
+
+Signed-off-by: Bo-Cun Chen <bc-bocun.chen@mediatek.com>
+---
+ drivers/net/ethernet/mediatek/mtk_eth_soc.c | 54 ++++++++++++++++-----
+ drivers/net/ethernet/mediatek/mtk_eth_soc.h |  1 +
+ 2 files changed, 42 insertions(+), 13 deletions(-)
+
+diff --git a/drivers/net/ethernet/mediatek/mtk_eth_soc.c b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
+index b9f8fd6..0287f68 100644
+--- a/drivers/net/ethernet/mediatek/mtk_eth_soc.c
++++ b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
+@@ -975,9 +975,25 @@ static const struct phylink_mac_ops mtk_phylink_ops = {
+ 	.mac_link_up = mtk_mac_link_up,
+ };
+ 
++static void mtk_mdio_config(struct mtk_eth *eth)
++{
++	u32 val;
++
++	/* Configure MDC Divider */
++	val = FIELD_PREP(PPSC_MDC_CFG, eth->mdc_divider);
++
++	/* Configure MDC Turbo Mode */
++	if (mtk_is_netsys_v3_or_greater(eth))
++		mtk_m32(eth, 0, MISC_MDC_TURBO, MTK_MAC_MISC_V3);
++	else
++		mtk_m32(eth, 0, PPSC_MDC_TURBO, MTK_PPSC);
++
++	mtk_m32(eth, PPSC_MDC_CFG, val, MTK_PPSC);
++}
++
+ static int mtk_mdio_init(struct mtk_eth *eth)
+ {
+-	unsigned int max_clk = 2500000, divider;
++	unsigned int max_clk = 2500000, min_clk, divider, output;
+ 	struct device_node *mii_np;
+ 	int ret;
+ 	u32 val;
+@@ -1011,26 +1027,34 @@ static int mtk_mdio_init(struct mtk_eth *eth)
+ 	snprintf(eth->mii_bus->id, MII_BUS_ID_SIZE, "%pOFn", mii_np);
+ 
+ 	if (!of_property_read_u32(mii_np, "clock-frequency", &val)) {
+-		if (val > MDC_MAX_FREQ || val < MDC_MAX_FREQ / MDC_MAX_DIVIDER) {
++		if (mtk_is_netsys_v3_or_greater(eth) &&
++		    (eth->soc->caps != MT7988_CAPS))
++			min_clk = (2 * MDC_MAX_FREQ) / (MDC_MAX_DIVIDER + 1);
++		else
++			min_clk = MDC_MAX_FREQ / MDC_MAX_DIVIDER;
++
++		if (val > MDC_MAX_FREQ || val < min_clk) {
+ 			dev_err(eth->dev, "MDIO clock frequency out of range");
+ 			ret = -EINVAL;
+ 			goto err_put_node;
+ 		}
+ 		max_clk = val;
+ 	}
+-	divider = min_t(unsigned int, DIV_ROUND_UP(MDC_MAX_FREQ, max_clk), 63);
+-
+-	/* Configure MDC Turbo Mode */
+-	if (mtk_is_netsys_v3_or_greater(eth))
+-		mtk_m32(eth, 0, MISC_MDC_TURBO, MTK_MAC_MISC_V3);
+ 
+-	/* Configure MDC Divider */
+-	val = FIELD_PREP(PPSC_MDC_CFG, divider);
+-	if (!mtk_is_netsys_v3_or_greater(eth))
+-		val |= PPSC_MDC_TURBO;
+-	mtk_m32(eth, PPSC_MDC_CFG, val, MTK_PPSC);
++	if (mtk_is_netsys_v3_or_greater(eth) &&
++	    (eth->soc->caps != MT7988_CAPS)) {
++		divider = min_t(unsigned int,
++				DIV_ROUND_UP(2 * MDC_MAX_FREQ, max_clk) - 1, 63);
++		output = (2 * MDC_MAX_FREQ) / (divider + 1);
++	} else {
++		divider = min_t(unsigned int,
++				DIV_ROUND_UP(MDC_MAX_FREQ, max_clk), 63);
++		output = MDC_MAX_FREQ / divider;
++	}
+ 
+-	dev_dbg(eth->dev, "MDC is running on %d Hz\n", MDC_MAX_FREQ / divider);
++	eth->mdc_divider = divider;
++	mtk_mdio_config(eth);
++	dev_dbg(eth->dev, "MDC is running on %d Hz\n", output);
+ 
+ 	ret = of_mdiobus_register(eth->mii_bus, mii_np);
+ 
+@@ -4165,6 +4189,10 @@ static int mtk_hw_init(struct mtk_eth *eth, bool reset)
+ 	else
+ 		mtk_hw_reset(eth);
+ 
++	/* No MT7628/88 support yet */
++	if (!MTK_HAS_CAPS(eth->soc->caps, MTK_SOC_MT7628))
++		mtk_mdio_config(eth);
++
+ 	if (mtk_is_netsys_v3_or_greater(eth)) {
+ 		/* Set FE to PDMAv2 if necessary */
+ 		val = mtk_r32(eth, MTK_FE_GLO_MISC);
+diff --git a/drivers/net/ethernet/mediatek/mtk_eth_soc.h b/drivers/net/ethernet/mediatek/mtk_eth_soc.h
+index 3520980..b768ce0 100644
+--- a/drivers/net/ethernet/mediatek/mtk_eth_soc.h
++++ b/drivers/net/ethernet/mediatek/mtk_eth_soc.h
+@@ -1380,6 +1380,7 @@ struct mtk_eth {
+ 	struct clk			*clks[MTK_CLK_MAX];
+ 
+ 	struct mii_bus			*mii_bus;
++	unsigned int			mdc_divider;
+ 	struct work_struct		pending_work;
+ 	unsigned long			state;
+ 
+-- 
+2.45.2
+

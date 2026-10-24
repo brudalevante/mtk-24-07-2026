@@ -1,0 +1,11 @@
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_bananapi_bpi-r4-lite is not set
+# CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_mediatek_mt7987a-rfb is not set
+CONFIG_PACKAGE_aqr10g-phy-firmware=y
+CONFIG_PACKAGE_kmod-gpio-pca953x=m
+CONFIG_PACKAGE_kmod-gpio-pcf857x=y
+CONFIG_PACKAGE_kmod-hwmon-ina2xx=y
+CONFIG_PACKAGE_kmod-usb3=y
+CONFIG_PACKAGE_blkid=y
+CONFIG_PACKAGE_e2fsprogs=y
+CONFIG_PACKAGE_f2fsck=y
+CONFIG_PACKAGE_mkf2fs=y

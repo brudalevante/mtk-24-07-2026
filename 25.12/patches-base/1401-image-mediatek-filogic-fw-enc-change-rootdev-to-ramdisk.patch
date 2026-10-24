@@ -1,0 +1,22 @@
+--- a/target/linux/mediatek/image/Makefile
++++ b/target/linux/mediatek/image/Makefile
+@@ -78,10 +78,18 @@ define Build/prepare-dm-verity
+ 	$(call Build/fdt-patch-dm-verity)
+ endef
+ 
++define Build/change-rootdev-to-ramdisk
++	$(TOPDIR)/scripts/fdt-patch-rootdev.sh $(STAGING_DIR_HOSTPKG) \
++		$(KDIR)/image-$(firstword $(DEVICE_DTS)).dtb bootargs /dev/ram 1
++	$(call fdt-patch-all-rootdev,bootargs-append,/dev/ram,0)
++endef
++
+ define Build/secure-boot
+-	$(if $(CONFIG_MTK_SECURE_BOOT),$(call Build/prepare-dm-verity))
++	$(if $(CONFIG_MTK_SECURE_BOOT), \
++		$(if $(CONFIG_MTK_FW_ENC_USE_RAMDISK),,$(call Build/prepare-dm-verity)))
+ 	$(if $(filter-out mt7987%, $(DEVICE_DTS)), \
+ 		$(if $(CONFIG_PACKAGE_optee-client),$(call Build/append-opteenode)))
++	$(if $(CONFIG_MTK_FW_ENC_USE_RAMDISK),$(call Build/change-rootdev-to-ramdisk))
+ endef
+ 
+ define Build/secure-boot-initramfs
